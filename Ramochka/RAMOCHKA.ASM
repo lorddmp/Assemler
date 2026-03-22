@@ -1,8 +1,9 @@
-ё.model tiny
+.model tiny
 .code
 org 100h
 
-Start:			mov ax, 0b800h
+Start:			
+			mov ax, 0b800h
 			mov es, ax  
 			mov dx, 0h
 			mov al, ds: byte ptr [80h]	;get length
@@ -12,7 +13,7 @@ Start:			mov ax, 0b800h
 			mov bx, ax
 			sar bx, 1h			;find otstup
 			sal bx, 1h
-			mov di, 50h
+			mov di, 50h	
 			sub di, bx
 			mov bx, di	
 
