@@ -5,18 +5,27 @@ org 100h
 Start:			push 0							;segment 0
 				pop es				
 				cli								;stop interruptions
+
+				mov bx, 08*4h
+				mov ax, es:[bx]
+				mov cs:old_off_08, ax				
+				mov es:[bx], offset Proga_08
+												;save and repare 08h
+				mov ax, es:[bx+2]				
+				mov cs:old_seg_08, ax
+				mov ax, cs
+				mov es:[bx+2], ax			
+
 				mov bx, 09*4h
 				mov ax, es:[bx]
-				mov cs:old_off, ax				;save old offset
-				mov es:[bx], offset Proga		;smeschenie - gde code
-
-				mov ax, es:[bx+2]				;save old segment
-				mov cs:old_seg, ax
+				mov cs:old_off_09, ax				
+				mov es:[bx], offset Proga_09
+												;save and repare 09h
+				mov ax, es:[bx+2]			
+				mov cs:old_seg_09, ax
 				mov ax, cs
-				mov es:[bx+2], ax				;segment = segment code
+				mov es:[bx+2], ax				
 				sti
-
-				int 09h
 
 				mov ax, 3100h					;func to exit and save
 				mov dx, offset EndProg			;size of prog
@@ -24,7 +33,9 @@ Start:			push 0							;segment 0
 				inc dx
 				int 21h
 
-hot_key_code equ 02h
+flag_main db 0
+hot_key1_code equ 02h
+hot_key2_code equ 03h
 left_high_ang equ 63*2
 left_low_ang equ (80*14+63)*2
 ramka_length equ 14h
@@ -33,7 +44,48 @@ hex_mas db '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'
 reg_mas db 'A','X','B','X','C','X','D','X','S','I','D','I','B','P','S','P','D','S','E','S','S','S','C','S','I','P'
 val_mas dw 100 dup (0)
 
-Proga			proc								;main function
+Proga_09		proc								;main function
+
+				mov cs: word ptr val_mas[0],  ax
+				mov cs: word ptr val_mas[2],  bx
+
+				xor ax, ax
+				in al, 60h							;read symbol
+
+				cmp al, hot_key1_code
+				jne .key2_check
+
+				mov cs:flag_main, 1h
+				jmp .ret_9h
+
+.key2_check:	cmp al, hot_key2_code
+				jne .exit_as_usual
+
+				mov cs:flag_main, 0h
+
+.ret_9h:		mov ax, cs: word ptr val_mas[0]
+				mov bx, cs: word ptr val_mas[2]
+
+				in al, 61h			
+				or al, 80h  						;Work with
+				out 61h, al							;61h and 20h to end
+				and al, not 80h						;working correctly
+				out 61h, al
+				mov al, 20h
+				out 20h, al
+
+				iret
+
+.exit_as_usual:	
+				mov ax, cs: word ptr val_mas[0]
+				mov bx, cs: word ptr val_mas[2]
+
+				db 0eah								;jmp far
+				old_off_09 dw 0
+				old_seg_09 dw 0
+				endp
+
+Proga_08      	proc
 
 				mov cs: word ptr val_mas[0],  ax
 				mov cs: word ptr val_mas[2],  bx
@@ -52,18 +104,11 @@ Proga			proc								;main function
 				mov ax, ss: word ptr [bx]
 				mov cs: word ptr val_mas[24], ax
 
-				xor ax, ax
-				in al, 60h							;read symbol
-
-				cmp al, hot_key_code
+				cmp cs:flag_main, 1h
 				je .make_ramka
 
-				mov ax, cs: word ptr val_mas[0]
-				mov bx, cs: word ptr val_mas[2]
+				jmp .exit_exit
 
-				db 0eah								;jmp far
-				old_off dw 0
-				old_seg dw 0
 				endp
 
 .make_ramka:	
@@ -161,16 +206,6 @@ Cycle2:
 				jmp Correct_end
 
 Correct_end:		
-				in al, 61h			
-				or al, 80h  						;Work with
-				out 61h, al							;61h and 20h to end
-				and al, not 80h						;working correctly
-				out 61h, al
-				mov al, 20h
-				out 20h, al
-
-				mov ax, cs: word ptr val_mas[0]
-				mov bx, cs: word ptr val_mas[2]
 				mov cx, cs: word ptr val_mas[4]		;bring back registers
 				mov dx, cs: word ptr val_mas[6]
 				mov si, cs: word ptr val_mas[8]
@@ -181,7 +216,13 @@ Correct_end:
 				mov es, cs: word ptr val_mas[18]
 				mov ss, cs: word ptr val_mas[20]
 
-				iret
+.exit_exit:	
+				mov ax, cs: word ptr val_mas[0]
+				mov bx, cs: word ptr val_mas[2]
+				db 0eah
+				old_off_08 dw 0
+				old_seg_08 dw 0
+
 				endp
 
 EndProg:
