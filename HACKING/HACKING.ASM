@@ -7,32 +7,21 @@ Start:
                     mov ah, 9h
                     int 21h
 
+                    xor si, si
                     xor di, di
                     xor dx, dx
 
-Count_hash:        
-                    mov ah, 8h
-                    int 21h
+mas_password db 10 dup (0)
 
-                    cmp al, 13
-                    je .check
-
-                    mov dl, al
-                    add di, dx
-
-                    mov dl, '*'
-                    mov ax, 0200h
-                    int 21h
-
-                    loop Count_hash
-
+                    call Count_hash
+ 
 .check:             
-                    push 0b800h
-                    pop es
                     cmp di, password_hash
                     jne .print_wrong
 
 .print_right:       
+                    push 0b800h
+                    pop es
                     mov bx, left_high_ang
 			        mov es: word ptr [bx], 2fc9h
 			        add bx, (right_lable_len*2 + 2)
@@ -71,7 +60,9 @@ Cycle_write:        mov es: word ptr [bx], 2fcdh
 
                     jmp .exit_exit
 
-.print_wrong:       
+.print_wrong:     
+                    push 0b800h
+                    pop es
                     mov bx, left_high_ang
 			        mov es: word ptr [bx], 4fc9h
 			        add bx, (wrong_lable_len*2 + 2)
@@ -122,4 +113,25 @@ right_lable_len equ 0eh
 wrong_lable db "Access denied"
 wrong_lable_len equ 0dh
 
+Count_hash:
+                    mov ah, 8h
+                    int 21h
+
+                    cmp al, 13 
+                    je .return_back
+
+                    mov mas_password [si], al
+                    inc si
+
+                    mov dl, al
+                    add di, dx
+
+                    mov dl, '*'
+                    mov ax, 0200h
+                    int 21h
+
+                    jmp Count_hash
+.return_back:       ret
+
 end                 Start
+
