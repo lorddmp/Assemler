@@ -4,7 +4,7 @@ org 100h
 
 Start:			push 0							;segment 0
 				pop es				
-				cli								;stop interruptions
+				cli								;stop interrupts
 
 				mov bx, 08*4h
 				mov ax, es:[bx]

@@ -1,0 +1,4 @@
+nasm -f elf64 haha.asm -o printf.o
+gcc -c haha.c -o haha.o
+gcc -no-pie haha.o printf.o -o proga
+./proga
