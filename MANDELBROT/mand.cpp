@@ -31,72 +31,73 @@ int main()
     SDL_Event event;
     int running = 1;
 
-    const int help_mas[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-    float virtual_x[8] = {};
-    float virtual_y[8] = {};
-    float new_x[8] = {};
-    float new_y[8] = {};
-    int iteration[8] = {};
-    unsigned char mas_flag = 0;
+    const float help_mas[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    unsigned char mask_flag = 0;
 
     float offset_x = 0;
     float offset_y = 0;
 
-    float var = 0;
     float zoom = 1;    
 
     while (running) 
     {
         for (long y = 0; y < height; y++) 
         {
-            for (int i = 0; i < 8; i++)
-                virtual_y[i] = offset_y + (y - height/2) * step * zoom;
+            float virtual_y = offset_y + (y - height/2) * step * zoom;
+            __m256 vect_virt_y = _mm256_set1_ps(virtual_y);
 
             for (long x = 0; x < width; x += 8) 
             {
-                for (int i = 0; i < 8; i++)
-                    virtual_x[i] = offset_x + (x + help_mas[i] - width/2) * step * zoom;
+                float virtual_x = offset_x + (x - width/2) * step * zoom;
+                __m256 vect_virt_x = _mm256_set1_ps(virtual_x);
+                __m256 vect_help_mas = _mm256_loadu_ps(help_mas);
+                __m256 vect_const_mas = _mm256_set1_ps(step*zoom);
+                vect_help_mas = _mm256_mul_ps(vect_help_mas, vect_const_mas);
+                vect_virt_x = _mm256_add_ps(vect_virt_x, vect_help_mas);
 
-                mas_flag = 0;
-                memset(iteration, 0, 8*sizeof(int));
-                memset(new_x, 0, 8*sizeof(float));
-                memset(new_y, 0, 8*sizeof(float));
+                mask_flag = 0;
+                __m256 new_x = _mm256_set1_ps(0);
+                __m256 new_y = _mm256_set1_ps(0);
+                // __m256 iteration = _mm256_set1_ps(0);
+                int iteration[8] = {};
 
-                for(int iter_counter = 0; mas_flag != 255 && iter_counter < 256; iter_counter++)
+                for (int iter_counter = 0; mask_flag != 255 && iter_counter < 256; iter_counter++)
                 {
+                    __m256 old_x = new_x;
+                    __m256 old_y = new_y;
+                    new_x = _mm256_add_ps(_mm256_sub_ps(_mm256_mul_ps(old_x, old_x), _mm256_mul_ps(old_y, old_y)), vect_virt_x);     //new_x[i]*new_x[i] - new_y[i]*new_y[i] + virtual_x[i];
+                    new_y = _mm256_add_ps(_mm256_mul_ps(_mm256_mul_ps(_mm256_set1_ps(2), old_x), old_y), vect_virt_y);                                      //2*new_x[i]*new_y[i] + virtual_y[i];
+
+                    int mask = _mm256_movemask_ps(_mm256_cmp_ps(_mm256_add_ps(_mm256_mul_ps(new_x, new_x), _mm256_mul_ps(new_y, new_y)), _mm256_set1_ps(MAX_RADIUS), _CMP_GE_OQ));
+
                     for (int i = 0; i < 8; i++)
                     {
-                        if (mas_flag & (1 << (7 - i)))
-                            continue;
-
-                        var = new_x[i]*new_x[i] - new_y[i]*new_y[i] + virtual_x[i];
-                        new_y[i] = 2*new_x[i]*new_y[i] + virtual_y[i];
-                        new_x[i] = var;
-
-                        if (new_x[i]*new_x[i] + new_y[i]*new_y[i] >= MAX_RADIUS)
+                        if ( !(mask_flag & (1 << i)) && ((mask >> i) & 1) ) 
                         {
-                            mas_flag += (1 << (7 - i));
+                            mask_flag |= (1 << i);
                             iteration[i] = iter_counter;
                         }
                     }
                 }
 
                 for (int i = 0; i < 8; i++) 
+                {
                     if (iteration[i] == 0) 
                         iteration[i] = MAX_ITER;
+                    // printf ("%d) iteration = %d\n", i, iteration[i]);
+                }
 
 
-                // printf ("iteration = %d\n", iteration);
                 // printf("virtual_x = %lf, y = %lf", virtual_x, virtual_y);
                 for (int i = 0; i < 8; i++)
                 {
                     if (iteration[i] == MAX_ITER) 
-                        pixels[y * width + (x + help_mas[i])] = 0xFF000000;
+                        pixels[y * width + (x + (int)help_mas[i])] = 0xFF000000;
 
                     else
                     {
-                        int color = 0xFF000000 + (iteration[i] << 30) + (iteration[i] << 20) + (iteration[i] << 10);
-                        pixels[y  * width + (x + help_mas[i])] = color;
+                        int color = 0xFF000000 | (iteration[i] << 30) | (iteration[i] << 20) | (iteration[i] << 10);
+                        pixels[y  * width + (x + (int)help_mas[i])] = color;
                     }
 
                 }
