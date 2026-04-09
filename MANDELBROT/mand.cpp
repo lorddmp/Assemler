@@ -1,14 +1,12 @@
 #include <SDL2/SDL.h>
+#include <immintrin.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #define MAX_ITER  256
 #define MAX_RADIUS 100
 
-struct point:
-{
-
-}
 
 int main() 
 {
@@ -33,47 +31,74 @@ int main()
     SDL_Event event;
     int running = 1;
 
-    float* virtual_x = -9.6;
-    float virtual_y = -5.4;
+    const int help_mas[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    float virtual_x[8] = {};
+    float virtual_y[8] = {};
+    float new_x[8] = {};
+    float new_y[8] = {};
+    int iteration[8] = {};
+    unsigned char mas_flag = 0;
+
     float offset_x = 0;
     float offset_y = 0;
 
-    float new_x, new_y, var = 0;
+    float var = 0;
     float zoom = 1;    
-    long int iteration = 0;
 
     while (running) 
     {
-        for (long y = 0; y < height; y++, virtual_y += step * zoom) 
+        for (long y = 0; y < height; y++) 
         {
-            virtual_y = offset_y + (y - height/2) * step * zoom;
-            for (long x = 0; x < width; x++, virtual_x += step * zoom) 
+            for (int i = 0; i < 8; i++)
+                virtual_y[i] = offset_y + (y - height/2) * step * zoom;
+
+            for (long x = 0; x < width; x += 8) 
             {
-                virtual_x = offset_x + (x - width/2) * step * zoom;
-                iteration = 0;
-                new_x = 0;
-                new_y = 0;
+                for (int i = 0; i < 8; i++)
+                    virtual_x[i] = offset_x + (x + help_mas[i] - width/2) * step * zoom;
 
-                for(; iteration < MAX_ITER; iteration++)
+                mas_flag = 0;
+                memset(iteration, 0, 8*sizeof(int));
+                memset(new_x, 0, 8*sizeof(float));
+                memset(new_y, 0, 8*sizeof(float));
+
+                for(int iter_counter = 0; mas_flag != 255 && iter_counter < 256; iter_counter++)
                 {
-                    var = new_x*new_x - new_y*new_y + virtual_x;
-                    new_y = 2*new_x*new_y + virtual_y;
-                    new_x = var;
+                    for (int i = 0; i < 8; i++)
+                    {
+                        if (mas_flag & (1 << (7 - i)))
+                            continue;
 
-                    if (new_x*new_x + new_y*new_y >= MAX_RADIUS)
-                        break;
+                        var = new_x[i]*new_x[i] - new_y[i]*new_y[i] + virtual_x[i];
+                        new_y[i] = 2*new_x[i]*new_y[i] + virtual_y[i];
+                        new_x[i] = var;
+
+                        if (new_x[i]*new_x[i] + new_y[i]*new_y[i] >= MAX_RADIUS)
+                        {
+                            mas_flag += (1 << (7 - i));
+                            iteration[i] = iter_counter;
+                        }
+                    }
                 }
+
+                for (int i = 0; i < 8; i++) 
+                    if (iteration[i] == 0) 
+                        iteration[i] = MAX_ITER;
+
 
                 // printf ("iteration = %d\n", iteration);
                 // printf("virtual_x = %lf, y = %lf", virtual_x, virtual_y);
-
-                if (iteration == MAX_ITER) 
-                    pixels[y * width + x] = 0xFF000000;
-
-                else
+                for (int i = 0; i < 8; i++)
                 {
-                    int color = 0xFF000000 + (iteration << 30) + (iteration << 20) + (iteration << 10);
-                    pixels[y * width + x] = color;
+                    if (iteration[i] == MAX_ITER) 
+                        pixels[y * width + (x + help_mas[i])] = 0xFF000000;
+
+                    else
+                    {
+                        int color = 0xFF000000 + (iteration[i] << 30) + (iteration[i] << 20) + (iteration[i] << 10);
+                        pixels[y  * width + (x + help_mas[i])] = color;
+                    }
+
                 }
             }
         }
